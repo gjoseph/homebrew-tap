@@ -1,0 +1,82 @@
+name: Update Formulae
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [release]
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        include:
+          - formula: brew-update-all-the-things
+            source_repo: gjoseph/brew-update-all-the-things
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REPO: ${{ matrix.source_repo }}
+        run: |
+          BINARY="${SOURCE_REPO##*/}"
+          VERSION=$(gh api repos/$SOURCE_REPO/releases/latest --jq '.tag_name')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "asset_url=https://github.com/$SOURCE_REPO/releases/download/$VERSION/$BINARY" >> "$GITHUB_OUTPUT"
+
+      - name: Check if update needed
+        id: check
+        env:
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          CURRENT_URL=$(grep -oP '(?<=url ").*(?=")' Formula/$FORMULA.rb)
+          LATEST_URL="${{ steps.release.outputs.asset_url }}"
+          if [ "$CURRENT_URL" != "$LATEST_URL" ]; then
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download and compute SHA256
+        if: steps.check.outputs.needs_update == 'true'
+        id: sha256
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REPO: ${{ matrix.source_repo }}
+        run: |
+          BINARY="${SOURCE_REPO##*/}"
+          gh release download "${{ steps.release.outputs.version }}" \
+            --repo $SOURCE_REPO \
+            --pattern "$BINARY" \
+            --dir /tmp
+          SHA256=$(sha256sum /tmp/$BINARY | awk '{print $1}')
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+
+      - name: Update formula
+        if: steps.check.outputs.needs_update == 'true'
+        env:
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          ASSET_URL="${{ steps.release.outputs.asset_url }}"
+          SHA256="${{ steps.sha256.outputs.sha256 }}"
+          sed -i "s|url \".*\"|url \"$ASSET_URL\"|" Formula/$FORMULA.rb
+          sed -i "s|sha256 \".*\"|sha256 \"$SHA256\"|" Formula/$FORMULA.rb
+
+      - name: Commit and push
+        if: steps.check.outputs.needs_update == 'true'
+        env:
+          FORMULA: ${{ matrix.formula }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/$FORMULA.rb
+          git commit -m "$FORMULA ${{ steps.release.outputs.version }}"
+          git push
