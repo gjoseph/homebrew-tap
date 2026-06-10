@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - formula: brew-update-all-the-things
-            source_repo: gjoseph/brew-update-all-the-things
+            repo: gjoseph/brew-update-all-the-things
 
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-          SOURCE_REPO: ${{ matrix.source_repo }}
+          SOURCE_REPO: ${{ matrix.repo }}
         run: |
           BINARY="${SOURCE_REPO##*/}"
           VERSION=$(gh api repos/$SOURCE_REPO/releases/latest --jq '.tag_name')
@@ -50,7 +50,7 @@ jobs:
         id: sha256
         env:
           GH_TOKEN: ${{ github.token }}
-          SOURCE_REPO: ${{ matrix.source_repo }}
+          SOURCE_REPO: ${{ matrix.repo }}
         run: |
           BINARY="${SOURCE_REPO##*/}"
           gh release download "${{ steps.release.outputs.version }}" \
