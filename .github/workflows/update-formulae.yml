@@ -15,8 +15,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - formula: brew-update-all-the-things
-            repo: gjoseph/brew-update-all-the-things
+          - formula: brewt
+            repo: gjoseph/brewt
 
     steps:
       - uses: actions/checkout@v4
