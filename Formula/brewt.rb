@@ -1,4 +1,4 @@
-class BrewUpdateAllTheThings < Formula
+class Brewt < Formula
   desc "Updates all Brew formulae and casks on a schedule"
   homepage "https://github.com/gjoseph/brewt"
   url "https://github.com/gjoseph/brewt/releases/download/v0.0.2/brewt"
